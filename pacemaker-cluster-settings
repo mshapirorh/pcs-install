@@ -1,0 +1,19 @@
+clustername=labcluster
+nodes=(
+  "pcs1"
+  "pcs2"
+)
+quorumnode=pcs3
+
+#################################################
+# Prep an array of all the nodes including quorum
+allnodes=("${nodes[@]}" "$quorumnode")
+lastnode="${nodes[-1]}"
+thisnode=$(hostname -s)
+
+echo "Proceeding with:"
+echo "Regular Nodes: ${nodes[@]}"
+echo "Quorum node: $quorumnode"
+echo "Last node where cluster-wide config will happen: $lastnode"
+echo "This node is: $thisnode"
+
