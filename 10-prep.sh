@@ -10,16 +10,16 @@ fnDeployNode() {
    
     # Installing cluster software
     # Authoritative documentation:
-    https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_and_managing_high_availability_clusters/assembly_creating-high-availability-cluster-configuring-and-managing-high-availability-clusters#proc_installing-cluster-software-creating-high-availability-cluster
+    # https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_and_managing_high_availability_clusters/assembly_creating-high-availability-cluster-configuring-and-managing-high-availability-clusters#proc_installing-cluster-software-creating-high-availability-cluster
  
     # Ensure high availability repo is on so RPMs can be installed:
-    # subscription-manager repos --enable=rhel-9-for-x86_64-highavailability-rpms
+    subscription-manager repos --enable=rhel-9-for-x86_64-highavailability-rpms
     
     # Install rpms:
     dnf -y install pcs pacemaker fence-agents-all || fnFail "Failed to install packages"
 
     # As we will be using corosync quorum device, we also need to follow the guide to using them here:
-    https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_and_managing_high_availability_clusters/assembly_configuring-quorum-devices-configuring-and-managing-high-availability-clusters#proc_installing-quorum-device-packages-configuring-quorum-devices
+    # https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_and_managing_high_availability_clusters/assembly_configuring-quorum-devices-configuring-and-managing-high-availability-clusters#proc_installing-quorum-device-packages-configuring-quorum-devices
     # On each node we also need to install the corosync-qdevice package
     dnf -y install corosync-qdevice || fnFail "Failed to install corosync-qdevice"
 
@@ -36,8 +36,6 @@ fnDeployNode() {
 
     # Enable and start the pcsd service:
     systemctl enable --now pcsd
-
-    # TODO: Apply the lvm configuration change
 }
 
 fnDeployQuorumNode() {
@@ -55,12 +53,12 @@ fnDeployQuorumNode() {
 	systemctl enable pcsd.service
         systemctl status pcsd.service || systemctl start pcsd.service
 
-	if ! pcs qdevice status net --full; do
+	if ! pcs qdevice status net --full; then
 		pcs qdevice setup model net --enable --start
                 pcs qdevice enable net
                 pcs qdevice start net
 		pcs qdevice status net --full
-	done
+	fi
 
 	firewall-cmd --permanent --add-service=high-availability
 	firewall-cmd --add-service=high-availability
@@ -81,11 +79,11 @@ fnRunFromLastNode() {
 	# And add the quorum node to it as well:
 	pcs quorum device add model net host=$quorumnode algorithm=ffsplit
 
-        # Enable cluster services by default:
-        pcs cluster enable --all
+    # Enable cluster services by default:
+    pcs cluster enable --all
 
-        # Check cluster status:
-        pcs cluster status
+    # Check cluster status:
+    pcs cluster status
 
 	# Check the quorum configuration:
 	pcs quorum config
