@@ -13,7 +13,8 @@ fnDeployNode() {
     # https://docs.redhat.com/en/documentation/red_hat_enterprise_linux/9/html/configuring_and_managing_high_availability_clusters/assembly_creating-high-availability-cluster-configuring-and-managing-high-availability-clusters#proc_installing-cluster-software-creating-high-availability-cluster
  
     # Ensure high availability repo is on so RPMs can be installed:
-    subscription-manager repos --enable=rhel-9-for-x86_64-highavailability-rpms
+    # subscription-manager repos --enable=rhel-9-for-x86_64-highavailability-rpms
+	subscription-manager repos --enable=rhel-9-for-x86_64-highavailability-eus-rpms
     
     # Install rpms:
     dnf -y install pcs pacemaker fence-agents-all || fnFail "Failed to install packages"
@@ -68,10 +69,9 @@ fnDeployQuorumNode() {
 fnRunFromLastNode() {
 	username=`cut -d: -f1 ./pacemaker-secret`
 	password=`cut -d: -f2 ./pacemaker-secret`
-	# all_nodes_in_a_string=`printf '%s ' "${nodes[@]}"`
-	all_nodes_in_a_string=pcs1
+	all_nodes_in_a_string=`printf '%s ' "${nodes[@]}"`
 	# Authenticate against each node in the cluster:
-	for node in pcs1; do
+	for node in $all_nodes_in_a_string; do
           pcs host auth -u "${username}" -p "${password}" $all_nodes_in_a_string $quorumnode
 	done
 	# Set up the cluster
