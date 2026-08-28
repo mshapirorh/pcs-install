@@ -79,14 +79,14 @@ fnVerify {
   for i in "${!hosts[@]}"; do
     echo "Verifying host ${hosts[$i]}"
     case `echo ${1}|cut -c $i` in
-      .)  pcs status nodes | grep ${hosts[$i]} |grep Standby
-          testresult=$0
+      .)  pcs status nodes | grep ${hosts[$i]} |grep Standby || testresult=210
           ;;
-      :)  pcs status nodes | grep ${hosts[$i]} |grep Online
-          testresult=$0
+      :)  pcs status nodes | grep ${hosts[$i]} |grep Online || testresult=220
           ;;
-      _)  pcs status nodes | grep ${hosts[$i]} |grep Offline
-          testresult=$0
+      _)  pcs status nodes | grep ${hosts[$i]} |grep Offline || testresult=230
+          # echo "fence_vmware_rest -a <vCenter-IP> -l <vCenter-username> -p '<vCenter-password>' --ssl-insecure -z -o status -n ${hosts[$i]}"a
+          # placeholder:
+          echo ON |grep ON && testresult=$((testresult + 5))
           ;;
       +)
           # Is the service up? If nothing is stopped. We do this first to get the the RTO timestamp as early as possible.
