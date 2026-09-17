@@ -26,10 +26,8 @@ To be useful in this way, all tests implemented
 
    nodes=(
      “zlps-sawp-nfv31”
-
      “zlps-sawp-nfv32”
      “blps-sawp-nfv31”
-
      “blps-sawp-nfv32”
    )
 
@@ -38,7 +36,6 @@ To be useful in this way, all tests implemented
 4. Are broken up into **stages**:
 
    Trigger stage \-\> Verify stage \-\> Restore stage
-
 
 The **trigger** stage **sets up starting working conditions** required by the test
 The **trigger** stage **checks condition correctness**
@@ -60,7 +57,6 @@ The **restore stage** restores the cluster to a requested state (often to the st
    For transferability from cluster to cluster without duplication, both the test names and the code refer to nodes in the cluster, explicitly as defined in the /root/pcs/pacemaker-cluster-config file, as **a**, **b**, **c** and **d.**
 
    The order in this file needs to be such that **a** and **b** are in one datacenter, and **c** and **d** are in the other.
-
 
 In the code, $a, $b, $c and $d resolve to the hostnames of the four nodes in the cluster being worked on.
 
@@ -115,12 +111,12 @@ In the code, $a, $b, $c and $d resolve to the hostnames of the four nodes in the
 X offline (and the VM is **OFF**)
 
         For example:
-
+```
 case "${test}--\`hostname \-s\`" in
 …
-  **20-ab--$a)   fnTriggerWrapper "+:::" ; fnTriggerStartRTO ; fnTriggerDropNetwork ;;**
-  **20-ab--$b)   sleep 30 ; fnVerifyWrapper "X+::" rto180 ; fnRestoreWrapper ":+::" ;;**
-
+  20-ab--$a)   fnTriggerWrapper "+:::" ; fnTriggerStartRTO ; fnTriggerDropNetwork ;;
+  20-ab--$b)   sleep 30 ; fnVerifyWrapper "X+::" rto180 ; fnRestoreWrapper ":+::" ;;
+```
         Breakdown:
 
 * These two lines define the 20-ab test. The first, what actions to perform on node $a, the second, on node $b. No actions will be performed if this test is run on nodes $c or $d.
