@@ -124,7 +124,7 @@ case "${test}--\`hostname \-s\`" in
 
   Its invocation will look like this:
 
-        **a:/root/pcs**\# ./pacemaker-test-harness.sh 20-ab all
+        a:/root/pcs\# ./pacemaker-test-harness.sh 20-ab all
 
 * The function names (fn**Trigger**…) imply they perform something **when the user requested the verb “trigger”** (or “all”, which includes “trigger”). They will do nothing and skip out if the user requested “verify” or “restore”.
 * The first function will set the cluster in a state defined by the **“+:::”** string. This means all nodes online, and services running on a.
