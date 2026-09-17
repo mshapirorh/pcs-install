@@ -1,0 +1,112 @@
+# Each verification specifies the expected shape of the cluster using 4 characters
+# To represent the state of each node
+# _ for expected Offline (off or non-reachable) node (checked from pcs only)
+# X for expected physically powered off node (checked against ESX VM state)
+# . for node in Standby
+# : for Online but not running resources
+# + for Online and running all resources. Current implementation assumes all resources are running on same node.
+# Expected resources are provided via array in the pacemaker-cluster-settings config file
+# So:
+# "+:__" tells fnVerify:
+# it should test the first node to be Online running all the resources (+)
+# it should test the second node to just be Online (:)
+# it should verify that the third and fourth nodes are offline (_)
+rc=0
+
+case "${test}--`hostname -s`" in
+  10-ab--*)    fnTriggerWrapper "+:::" ; fnTriggerStartRTO ; fnTriggerStandby $a 15 ; fnVerifyWrapper ".+::" rto180 ; fnRestoreWrapper ":+::" ;;
+  11-ba--*)    fnTriggerWrapper ":+::" ; fnTriggerStartRTO ; fnTriggerStandby $b 15 ; fnVerifyWrapper "+.::" rto180 ; fnRestoreWrapper "+:::" ;;
+  12-ab-c--*)  fnTriggerWrapper "+:::" ; fnTriggerStartRTO ; fnTriggerStandby $a 15 ; fnTriggerStandby $b 15 ; fnVerifyWrapper "..+:" rto180 ; fnRestoreWrapper "::+:" ;;
+  13-cd--*)    fnTriggerWrapper "::+:" ; fnTriggerStartRTO ; fnTriggerStandby $c 15 ; fnVerifyWrapper "::.+" rto180 ; fnRestoreWrapper ":::+" ;;
+  14-dc--*)    fnTriggerWrapper ":::+" ; fnTriggerStartRTO ; fnTriggerStandby $d 15 ; fnVerifyWrapper "::+." rto180 ; fnRestoreWrapper "::+:" ;;
+  15-cd-a--*)  fnTriggerWrapper "::+:" ; fnTriggerStartRTO ; fnTriggerStandby $c 15 ; fnTriggerStandby $d 15 ; fnVerifyWrapper "+:.." rto180 ; fnRestoreWrapper "+:::" ;;
+
+  20-ab--$a)   fnTriggerWrapper "+:::" ; fnTriggerStartRTO ; fnTriggerDropNetwork ;;
+  20-ab--$b)   sleep 30 ; fnVerifyWrapper "X+::" rto180 ; fnRestoreWrapper ":+::" ;;
+
+  21-ba--$b)   fnTriggerWrapper "+:::" ; fnTriggerStartRTO ; fnTriggerDropNetwork ;;
+  21-ba--$a)   sleep 30 ; fnVerifyWrapper "+X::" rto180 ; fnRestoreWrapper "+:::" ;;
+
+  30-ab-c--$a) fnTriggerWrapper "+:::" ; fnTriggerStartRTO ; fnTriggerStandby $b ; fnTriggerDropNetwork ;;
+  30-ab-c--$c) sleep 30 ; fnVerifyWrapper "X.+:" rto180 ; fnRestoreWrapper "::+:" ;;
+
+  40-cd--$c)   fnTriggerWrapper "::+:" ; fnTriggerStartRTO ; fnTriggerDropNetwork ;;
+  40-cd--$d)   sleep 30 ; fnVerifyWrapper "::X+" rto180 ; fnRestoreWrapper ":::+" ;;
+
+  41-dc--$d)   fnTriggerWrapper ":::+" ; fnTriggerStartRTO ; fnTriggerDropNetwork ;;
+  41-dc--$c)   sleep 30 ; fnVerifyWrapper "::+X" rto180 ; fnRestoreWrapper "::+:" ;;
+
+  50-cd-a--$c) fnTriggerWrapper "::+:" ; fnTriggerStartRTO ; fnTriggerStandby $d ; fnTriggerDropNetwork ;;
+  50-cd-a--$a) sleep 30 ; fnVerifyWrapper "+:X." rto180 ; fnRestoreWrapper "+:::" ;;
+
+  60-ab-cd--$a) fnTriggerWrapper "+:::" ; fnTriggerStartRTO ; fnTriggerRouteDisable $c ; fnTriggerRouteDisable $d ; fnVerifyWrapper "+:XX" rto180 ; fnRestoreByRebooting $b; fnRestoreWrapper "+:::" ;; # Verification/Restoration happens here if STONITH kills c and d and this half survives
+  60-ab-cd--$b) fnTriggerRouteDisable $c ; fnTriggerRouteDisable $d ;; # Run within 3 second proximity to the command on $a
+  60-ab-cd--$c) fnVerifyWrapper "XX+:" rto180 ; fnRestoreWrapper "+:::" ;; # Verification/Restoration need to be run here if STONITH kills a and b and this half survives
+
+  100-storage-*)
+          for vg in "${lvm_vgs[@]}"; do
+            for pv in $(pvs --select vg_name=${vg} -o pv_name --noheadings); do
+              echo "===== $(date) Starting vg $vg pv $pv Iteration"
+              pv_devicename=$(basename ${pv})
+              if echo "$pv_devicename"|grep -q flakey; then
+                 pv_shim_devicepath=${pv_devicename}
+                 pv_devicename=$(basename $pv_shim_devicepath|sed 's/.flakey//')
+              else
+                 pv_shim_devicepath=/dev/mapper/${pv_devicename}.flakey
+              fi
+              echo "Testing faults on PV $pv"
+              for fault in corruption ioerror; do
+                echo "===== $(date) Starting vg $vg pv $pv testing  $fault Iteration ; testresult is ${testresult} and rc is ${rc}"
+                fnTriggerWrapper "...."
+                fnTriggerStoragePrepWrapper ${vg} ${pv_shim_devicepath} ${pv}
+                fnTriggerStorageFault ${vg} ${pv_devicename} ${fault}
+                fnVerifyStorageWrapper ${vg} ${pv_shim_devicepath}
+                fnRestoreStorageWrapper ${vg} ${pv_shim_devicepath} ${pv}
+                fnRestoreWrapper ":..."
+                echo "===== $(date) Done vg $vg pv $pv testing  $fault Iteration ; testresult is ${testresult} and rc is ${rc}"
+                [ "x$verb" != "xall" ] && echo "Single pass only when called with any verb that isnt all, testresult is $testresult" && exit 0
+              done
+              echo "=====  $(date) Done vg $vg pv $pv Iteration"
+            done
+          done
+          ;;
+  100-storage-*)
+          for vg in "${lvm_vgs[@]}"; do
+            for pv in $(pvs --select vg_name=${vg} -o pv_name --noheadings); do
+              echo "===== $(date) Starting vg $vg pv $pv Iteration"
+              pv_devicename=$(basename ${pv})
+              if echo "$pv_devicename"|grep -q flakey; then
+                 pv_shim_devicepath=${pv_devicename}
+                 pv_devicename=$(basename $pv_shim_devicepath|sed 's/.flakey//')
+              else
+                 pv_shim_devicepath=/dev/mapper/${pv_devicename}.flakey
+              fi
+              echo "Testing faults on PV $pv"
+              for fault in ioerror; do
+                echo "===== $(date) Starting vg $vg pv $pv testing  $fault Iteration ; testresult is ${testresult} and rc is ${rc}"
+                fnTriggerWrapper "...."
+                fnTriggerStoragePrepWrapper ${vg} ${pv_shim_devicepath} ${pv}
+                fnTriggerStorageFault ${vg} ${pv_devicename} ${fault}
+                fnVerifyStorageWrapper ${vg} ${pv_shim_devicepath}
+                fnRestoreStorageWrapper ${vg} ${pv_shim_devicepath} ${pv}
+                fnRestoreWrapper ":..."
+                echo "===== $(date) Done vg $vg pv $pv testing  $fault Iteration ; testresult is ${testresult} and rc is ${rc}"
+                [ "x$verb" != "xall" ] && echo "Single pass only when called with any verb that isnt all, testresult is $testresult" && exit 0
+              done
+              echo "=====  $(date) Done vg $vg pv $pv Iteration"
+            done
+          done
+          ;;
+  *)      echo "Nothing to do"
+          ;;
+esac
+echo "testresult is ${testresult} and rc is $rc"
+if   [ "${rc}" -eq 0 ]; then
+  rc_string="SUCCESS"
+elif [ "${rc}" -eq 5 ]; then
+  rc_string="SUCCESSFUL RECOVERY_BUT_FAILED RTO"
+else
+  rc_string="UNSUCCESSFUL"
+fi
+[ "x$rto_result" != "x" ] && echo "$rto_result"
+echo "### Overall execution (all verbs) aggregate return code is ${rc}, ${verification_stage_string} ${rto_start_report_line_string} - Final Result is ${rc_string}"
